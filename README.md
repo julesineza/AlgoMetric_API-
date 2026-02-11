@@ -5,7 +5,7 @@
 The **Complexity Analyzer API** is a Flask-based REST API that measures the execution time of different algorithms for varying input sizes. It helps demonstrate how algorithm performance grows as input size increases, providing:
 
 - Runtime results in JSON format
-- Performance graphs saved as PNG files
+- Performance graphs generated in-memory and uploaded to **MinIO** object storage
 - Persistent storage of analysis results using SQLite
 
 This project is designed for learning and analyzing **time complexity** concepts such as:
@@ -20,10 +20,13 @@ This project is designed for learning and analyzing **time complexity** concepts
 
 - Analyze multiple algorithms through REST endpoints
 - Measure execution time using `time.perf_counter()`
-- Generate and save runtime graphs using Matplotlib
+- Generate runtime graphs using Matplotlib
+- **Upload graphs to MinIO** object storage using in-memory buffers (no local file storage)
 - Persist analysis results to SQLite database
 - Retrieve past analysis records by ID
 - Supports step-based input size testing
+- Environment variable management with `python-dotenv`
+- Unique filenames using `uuid` to avoid collisions
 
 ---
 
@@ -41,17 +44,44 @@ This project is designed for learning and analyzing **time complexity** concepts
 ## Project Structure
 
 ```
-complexity-analyzer/
+home_acitivity_api_flask/
 │
-├── app.py              # Main Flask API
-├── factorial.py        # Algorithm implementations
-├── requirements.txt    # Dependencies
-├── README.md           # Documentation
+├── main.py              # Main Flask API
+├── factorial.py          # Algorithm implementations
+├── requirements.txt      # Dependencies
+├── README.md             # Documentation
+├── .env                  # Environment variables (MinIO credentials)
+├── fabfile.py            # Fabric deployment script
+├── backup.sql            # Database backup
 ├── instance/
-│   └── algorithms.db   # SQLite database (auto-generated)
+│   └── algorithms.db     # SQLite database (auto-generated)
 └── images/
-    └── static/         # Generated graph images
+    └── static/
 ```
+
+---
+
+## MinIO Integration
+
+The API uses [MinIO](https://min.io/) as an S3-compatible object storage service to store algorithm performance graphs.
+
+### How It Works
+
+1. When an algorithm is analyzed, a performance graph is generated using Matplotlib
+2. The graph is saved to an **in-memory buffer** (`io.BytesIO`) — no files are written to disk
+3. The buffer is uploaded directly to a MinIO bucket (`public-images`) using `client.put_object()`
+4. A public URL to the graph is returned in the API response
+
+### MinIO Configuration
+
+The MinIO client connects to a remote MinIO server and requires credentials stored in a `.env` file:
+
+```env
+minio_user=your_minio_access_key
+minio_password=your_minio_secret_key
+```
+
+The MinIO server endpoint is configured at `34.207.164.36:9000` and graphs are stored in the `public-images` bucket.
 
 ---
 
@@ -78,10 +108,13 @@ venv\Scripts\activate         # Windows
 pip install -r requirements.txt
 ```
 
-### 4. Create Required Directories
+### 4. Configure Environment Variables
 
-```bash
-mkdir -p images/static
+Create a `.env` file in the project root with your MinIO credentials:
+
+```env
+minio_user=your_minio_access_key
+minio_password=your_minio_secret_key
 ```
 
 ---
@@ -91,7 +124,7 @@ mkdir -p images/static
 Start the Flask application:
 
 ```bash
-python app.py
+python main.py
 ```
 
 The server will run on:
@@ -153,7 +186,7 @@ curl "http://127.0.0.1:3000/analyze?algo=bubble_sort&n=500&steps=5"
   "start_time": 1234567890.123,
   "end_time": 1234567890.456,
   "total_analysis_time_seconds": 0.42,
-  "path_to_graph": "/images/static/bubble_sort.png"
+  "path_to_graph": "http://34.207.164.36:9000/public-images/bubble_sort<uuid>.png"
 }
 ```
 
@@ -176,7 +209,7 @@ Persists an analysis result to the SQLite database.
   "end_time": 1234567890.456,
   "total_time_ms": 420.5,
   "time_complexity": "O(n2)",
-  "path_to_graph": "/images/static/bubble_sort.png"
+  "path_to_graph": "http://34.207.164.36:9000/public-images/bubble_sort<uuid>.png"
 }
 ```
 
@@ -193,7 +226,7 @@ curl -X POST http://127.0.0.1:3000/save_analysis \
     "end_time": 1234567890.456,
     "total_time_ms": 420.5,
     "time_complexity": "O(n2)",
-    "path_to_graph": "/images/static/bubble_sort.png"
+    "path_to_graph": "http://34.207.164.36:9000/public-images/bubble_sort<uuid>.png"
   }'
 ```
 
@@ -239,7 +272,7 @@ curl http://127.0.0.1:3000/retrieve_analysis/1
   "start_time": 1234567890.123,
   "end_time": 1234567890.456,
   "time_complexity": "O(n2)",
-  "path_to_graph": "/images/static/bubble_sort.png"
+  "path_to_graph": "http://34.207.164.36:9000/public-images/bubble_sort<uuid>.png"
 }
 ```
 
@@ -257,17 +290,17 @@ curl http://127.0.0.1:3000/retrieve_analysis/1
 
 The API uses SQLite with Flask-SQLAlchemy. The `algorithm_info` table stores:
 
-| Column            | Type    | Description                   |
-| ----------------- | ------- | ----------------------------- |
-| `id`              | Integer | Primary key (auto-increment)  |
-| `algo_name`       | String  | Name of the algorithm         |
-| `items`           | Integer | Maximum input size (n)        |
-| `steps`           | Integer | Number of measurement steps   |
-| `start_time`      | Float   | Analysis start timestamp      |
-| `end_time`        | Float   | Analysis end timestamp        |
-| `total_time_ms`   | Float   | Total analysis duration       |
-| `time_complexity` | String  | Big-O notation                |
-| `path_to_graph`   | String  | Path to the saved graph image |
+| Column            | Type    | Description                  |
+| ----------------- | ------- | ---------------------------- |
+| `id`              | Integer | Primary key (auto-increment) |
+| `algo_name`       | String  | Name of the algorithm        |
+| `items`           | Integer | Maximum input size (n)       |
+| `steps`           | Integer | Number of measurement steps  |
+| `start_time`      | Float   | Analysis start timestamp     |
+| `end_time`        | Float   | Analysis end timestamp       |
+| `total_time_ms`   | Float   | Total analysis duration      |
+| `time_complexity` | String  | Big-O notation               |
+| `path_to_graph`   | String  | MinIO URL to the graph image |
 
 ---
 
@@ -277,6 +310,9 @@ The API uses SQLite with Flask-SQLAlchemy. The `algorithm_info` table stores:
 Flask
 Flask-SQLAlchemy
 matplotlib
+minio
+python-dotenv
+numpy
 ```
 
 ---

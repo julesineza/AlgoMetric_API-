@@ -96,25 +96,13 @@ def analyze_algo(algo_name,n,steps):
     plt.xlabel("Input Size (n)")
     plt.ylabel("Execution Time (seconds)")
 
-    # Convert plot into Base64
-    # buf = io.BytesIO()
-    #where to save the image
-    IMAGES_DIR = os.path.join(app.root_path, 'images')
-    STATIC_DIR = os.path.join(IMAGES_DIR, 'static')
-    
+    # Save plot to an in-memory buffer
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close()
 
     file_name = f"{algo_name}{uuid.uuid4()}.png"
-
-    #create full path by joining the image dir with the name 
-    full_path=os.path.join(IMAGES_DIR,file_name)
-
-
-    plt.savefig(full_path, format="png")
-    
-    # buf.seek(0)
-
-    # graph_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
 
     #saving the image to minio
     bucket_name = "public-images"
@@ -123,11 +111,13 @@ def analyze_algo(algo_name,n,steps):
     if not client.bucket_exists(bucket_name):
         client.make_bucket(bucket_name)
 
-    # Upload file
-    client.fput_object(
+    # Upload from buffer
+    buf_size = buf.getbuffer().nbytes
+    client.put_object(
         bucket_name,
         file_name,
-        full_path,
+        buf,
+        length=buf_size,
         content_type="image/png"
     )
 

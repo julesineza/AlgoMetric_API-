@@ -5,3 +5,15 @@ Install the libs:
     - matplotlib - pip install matplotlib
     - Tkinter - sudo apt install python3-kinter
 Run the code
+
+
+{
+  "algorithm": "nested_loops",
+  "end_time": 69524.41613975,
+  "items": 1000,
+  "path_to_graph": "http://34.207.164.36:9000/public-images/nested_loops662cdb32-47e3-4196-9f22-332e3320a9fb.png",
+  "start_time": 69524.39152025,
+  "steps": 10,
+  "time_complexity": "O(n2)",
+  "total_analysis_time_seconds": 1.4172897079988616
+}
