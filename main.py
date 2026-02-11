@@ -5,11 +5,30 @@ import io
 import os
 from factorial import linear_search, bubble_sort, nested_loops, binary_search
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
+from minio import Minio
+import uuid
 
 #matplotlib initilization stuff 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+#getting minio cred
+load_dotenv()
+minio_user=os.getenv("minio_user")
+minio_password=os.getenv("minio_password")
+
+#setting up minio so we can upload the images
+from minio import Minio
+
+client = Minio(
+    "34.207.164.36:9000",
+    access_key=f"{minio_user}",
+    secret_key=f"{minio_password}",
+    secure=False
+)
+
 
 app = Flask(__name__)
 
@@ -84,18 +103,36 @@ def analyze_algo(algo_name,n,steps):
     STATIC_DIR = os.path.join(IMAGES_DIR, 'static')
     
 
-    file_name=f"{algo_name}.png"
+    file_name = f"{algo_name}{uuid.uuid4()}.png"
+
     #create full path by joining the image dir with the name 
     full_path=os.path.join(IMAGES_DIR,file_name)
 
+
     plt.savefig(full_path, format="png")
-    path_to_graph = f'/images/static/{file_name}'
+    
     # buf.seek(0)
 
     # graph_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
-    #TODO - put the base64 image on a url 
 
+    #saving the image to minio
+    bucket_name = "public-images"
+
+    # Ensure bucket exists
+    if not client.bucket_exists(bucket_name):
+        client.make_bucket(bucket_name)
+
+    # Upload file
+    client.fput_object(
+        bucket_name,
+        file_name,
+        full_path,
+        content_type="image/png"
+    )
+
+    # MinIO public URL (if bucket is public)
+    path_to_graph = f"http://34.207.164.36:9000/{bucket_name}/{file_name}"
 
     overall_end = time.perf_counter()
 

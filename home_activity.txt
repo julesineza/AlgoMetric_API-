@@ -19,7 +19,7 @@ Responds with:
     "time_complexity" : 'O(n)'
     "path_to_graph" : 
  }
-
+ 
 
  # =======================================
 
@@ -51,6 +51,7 @@ print(result.fetchall())
  }
 
 ```
+
 2. Create another end point called save_analysis (POST)
 
 curl -X POST http://localhost:8888/api/lead/convertToClient/$\(curl -s -H "Authorization: Bearer $(curl -s -X POST http://localhost:8888/api/login -H "Content-Type: application/json" -d '{
@@ -73,18 +74,3 @@ curl -X POST http://localhost:8888/api/lead/convertToClient/$\(curl -s -H "Autho
 
  5. Create another end point called retrieve_analysis that takes the analysis ID we got on step 4
  as a query parameter and gives us the json just like the analyze end point
-
-
- curl -X POST http://127.0.0.1:3000/save_analysis \
-  -H "Content-Type: application/json" \
-  -d '{
-    "algorithm": "binary_search",
-    "end_time": 299407.569235708,
-    "items": 1000,
-    "path_to_graph": "/images/static/binary_search.png",
-    "start_time": 299407.5690775,
-    "steps": 10,
-    "time_complexity": "O(log n)",
-    "total_time_ms": 0.05601229198509827
-
-  }'

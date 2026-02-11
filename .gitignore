@@ -6,4 +6,5 @@ linked_lists.py
 lists.py
 matrix_test.py
 __pycache__/
-
+.env
+minio_setup
